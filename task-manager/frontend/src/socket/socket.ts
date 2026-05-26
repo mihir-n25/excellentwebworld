@@ -8,6 +8,9 @@ export const connectSocket = (userId: string): Socket => {
   }
   socket = io("http://localhost:5000", {
     query: { userId },
+    reconnection: true,
+    reconnectionAttempts: 2,
+    reconnectionDelay: 1000,
   });
   return socket;
 };

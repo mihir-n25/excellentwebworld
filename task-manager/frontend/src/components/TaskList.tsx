@@ -1,7 +1,7 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "../context/AuthContext";
-import { getSocket } from "../socket/socket";
+import { connectSocket, getSocket, disconnectSocket } from "../socket/socket";
 import { Task } from "../types";
 import CreateTaskModal from "./CreateTaskModal";
 import Notification from "./Notification";
@@ -32,12 +32,39 @@ const TaskList = () => {
   const [showModal, setShowModal] = useState(false);
   const [notification, setNotification] = useState<string | null>(null);
   const [filter, setFilter] = useState<string>("all");
+  
+  // Track if socket has been connected to prevent duplicate connections
+  const socketConnectedRef = useRef(false);
 
   // React Query hooks
   const queryClient = useQueryClient();
   const { data: tasks = [], isLoading: loading } = useTasks(filter);
   const updateTaskStatusMutation = useUpdateTaskStatus();
 
+  // Lazy load socket: Connect only when TaskList component mounts
+  useEffect(() => {
+    if (!user?.id || socketConnectedRef.current) return;
+
+    const socket = getSocket();
+    
+    // If socket is already connected, don't reconnect
+    if (socket?.connected) {
+      socketConnectedRef.current = true;
+      return;
+    }
+
+    // Connect socket with user ID
+    connectSocket(user.id);
+    socketConnectedRef.current = true;
+
+    // Cleanup: Disconnect socket when component unmounts
+    return () => {
+      disconnectSocket();
+      socketConnectedRef.current = false;
+    };
+  }, [user?.id]);
+
+  // Listen for socket events
   useEffect(() => {
     const socket = getSocket();
     if (!socket) return;

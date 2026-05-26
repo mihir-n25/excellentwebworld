@@ -9,7 +9,7 @@ import {
   ReactNode,
 } from "react";
 import { User } from "../types";
-import { connectSocket, disconnectSocket, getSocket } from "../socket/socket";
+import { disconnectSocket } from "../socket/socket";
 import api from "../api/axios";
 
 interface AuthContextType {
@@ -38,9 +38,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   
   // Store access token in memory only (not localStorage)
   const accessTokenRef = useRef<string | null>(null);
-  
-  // Track if socket is connected to prevent duplicates
-  const socketConnectedRef = useRef(false);
 
   // Get access token (for axios interceptor)
   const getAccessToken = useCallback(() => accessTokenRef.current, []);
@@ -48,24 +45,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // Set access token in memory
   const setAccessToken = useCallback((token: string | null) => {
     accessTokenRef.current = token;
-  }, []);
-
-  // Connect socket with duplicate prevention
-  const connectUserSocket = useCallback((userId: string) => {
-    const socket = getSocket();
-    
-    // Prevent duplicate connections
-    if (socket?.connected && socketConnectedRef.current) {
-      return;
-    }
-
-    // Disconnect existing socket before creating new one
-    if (socket?.connected) {
-      disconnectSocket();
-    }
-
-    connectSocket(userId);
-    socketConnectedRef.current = true;
   }, []);
 
   // Refresh access token using refresh token from HttpOnly cookie
@@ -81,11 +60,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       
       setAccessToken(accessToken);
       setUser(userData);
-      
-      // Connect socket if not already connected
-      if (!socketConnectedRef.current) {
-        connectUserSocket(userData.id);
-      }
 
       return true;
     } catch (error) {
@@ -93,19 +67,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setAccessToken(null);
       setUser(null);
       disconnectSocket();
-      socketConnectedRef.current = false;
       return false;
     }
-  }, [setAccessToken, connectUserSocket]);
+  }, [setAccessToken]);
 
   // Login function
   const login = useCallback(
     (accessToken: string, userData: User) => {
       setAccessToken(accessToken);
       setUser(userData);
-      connectUserSocket(userData.id);
     },
-    [setAccessToken, connectUserSocket]
+    [setAccessToken]
   );
 
   // Logout function
@@ -120,7 +92,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setAccessToken(null);
       setUser(null);
       disconnectSocket();
-      socketConnectedRef.current = false;
     }
   }, [setAccessToken]);
 
@@ -152,7 +123,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     return () => {
       disconnectSocket();
-      socketConnectedRef.current = false;
     };
   }, []);
 
