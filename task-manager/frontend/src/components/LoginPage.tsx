@@ -16,11 +16,12 @@ const LoginPage = () => {
     setLoading(true);
 
     try {
-      const res = await api.post<{ token: string; user: User }>("/auth/login", {
-        email,
-        password,
-      });
-      login(res.data.token, res.data.user);
+      const res = await api.post<{ accessToken: string; user: User }>(
+        "/auth/login",
+        { email, password },
+        { withCredentials: true } // Send/receive cookies
+      );
+      login(res.data.accessToken, res.data.user);
     } catch {
       setError("Invalid email or password");
     } finally {

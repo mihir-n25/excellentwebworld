@@ -2,14 +2,10 @@ import axios from "axios";
 
 const api = axios.create({
   baseURL: "http://localhost:5000/api",
+  withCredentials: true, // Always send cookies
 });
 
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem("token");
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
+// Note: Authorization header is now added by AuthContext interceptor
+// This keeps token management centralized and secure
 
 export default api;

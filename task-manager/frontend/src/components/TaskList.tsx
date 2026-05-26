@@ -47,7 +47,7 @@ const TaskList = () => {
 
   useEffect(() => {
     fetchTasks();
-  }, [fetchTasks]);
+  }, []);
 
   useEffect(() => {
     const socket = getSocket();
