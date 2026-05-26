@@ -1,5 +1,6 @@
 import { useState, useEffect, FormEvent } from "react";
 import api from "../api/axios";
+import { useCreateTask } from "../hooks/useTasks";
 
 interface UserOption {
   _id: string;
@@ -16,8 +17,9 @@ const CreateTaskModal = ({ onClose, onCreated }: CreateTaskModalProps) => {
   const [title, setTitle] = useState("");
   const [assignedTo, setAssignedTo] = useState("");
   const [users, setUsers] = useState<UserOption[]>([]);
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  const createTaskMutation = useCreateTask();
 
   useEffect(() => {
     api.get<UserOption[]>("/auth/users").then((res) => {
@@ -29,17 +31,14 @@ const CreateTaskModal = ({ onClose, onCreated }: CreateTaskModalProps) => {
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!title.trim() || !assignedTo) return;
-    setLoading(true);
     setError("");
 
     try {
-      await api.post("/tasks", { title: title.trim(), assignedTo });
+      await createTaskMutation.mutateAsync({ title: title.trim(), assignedTo });
       onCreated();
       onClose();
     } catch {
       setError("Failed to create task");
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -140,10 +139,10 @@ const CreateTaskModal = ({ onClose, onCreated }: CreateTaskModalProps) => {
             </button>
             <button
               type="submit"
-              disabled={loading}
+              disabled={createTaskMutation.isPending}
               className="btn-primary flex-1 flex items-center justify-center gap-2"
             >
-              {loading ? (
+              {createTaskMutation.isPending ? (
                 <>
                   <svg className="animate-spin h-5 w-5" fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>

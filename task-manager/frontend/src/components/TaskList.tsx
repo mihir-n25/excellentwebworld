@@ -1,10 +1,11 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
-import api from "../api/axios";
+import { useState, useEffect, useMemo } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "../context/AuthContext";
 import { getSocket } from "../socket/socket";
 import { Task } from "../types";
 import CreateTaskModal from "./CreateTaskModal";
 import Notification from "./Notification";
+import { useTasks, useUpdateTaskStatus } from "../hooks/useTasks";
 
 const STATUS_OPTIONS = ["todo", "in-progress", "done"] as const;
 
@@ -28,28 +29,14 @@ const statusConfig: Record<string, { bg: string; text: string; icon: string }> =
 
 const TaskList = () => {
   const { user, logout } = useAuth();
-  const [tasks, setTasks] = useState<Task[]>([]);
   const [showModal, setShowModal] = useState(false);
   const [notification, setNotification] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<string>("all");
 
-  const fetchTasks = useCallback(async (status?: string) => {
-    setLoading(true);
-    try {
-      const params = status && status !== "all" ? { status } : {};
-      const res = await api.get<Task[]>("/tasks", { params });
-      setTasks(res.data);
-    } catch {
-      console.error("Failed to fetch tasks");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchTasks(filter);
-  }, [filter, fetchTasks]);
+  // React Query hooks
+  const queryClient = useQueryClient();
+  const { data: tasks = [], isLoading: loading } = useTasks(filter);
+  const updateTaskStatusMutation = useUpdateTaskStatus();
 
   useEffect(() => {
     const socket = getSocket();
@@ -57,8 +44,8 @@ const TaskList = () => {
 
     const handleAssigned = (task: Task) => {
       setNotification(`New task assigned: "${task.title}"`);
-      // Optimized: Add new task to state instead of refetching
-      setTasks((prev) => [task, ...prev]);
+      // Invalidate queries to refetch and show new task
+      queryClient.invalidateQueries({ queryKey: ["tasks"] });
     };
 
     socket.on("task:assigned", handleAssigned);
@@ -66,21 +53,10 @@ const TaskList = () => {
     return () => {
       socket.off("task:assigned", handleAssigned);
     };
-  }, []);
+  }, [queryClient]);
 
-  const handleStatusChange = async (taskId: string, newStatus: string) => {
-    try {
-      await api.patch(`/tasks/${taskId}/status`, { status: newStatus });
-      setTasks((prev) =>
-        prev.map((t) =>
-          t._id === taskId
-            ? { ...t, status: newStatus as Task["status"] }
-            : t
-        )
-      );
-    } catch {
-      console.error("Failed to update status");
-    }
+  const handleStatusChange = (taskId: string, newStatus: string) => {
+    updateTaskStatusMutation.mutate({ taskId, status: newStatus });
   };
 
   // Optimized: Single pass to calculate stats instead of multiple filter calls
@@ -350,7 +326,7 @@ const TaskList = () => {
       {showModal && (
         <CreateTaskModal
           onClose={() => setShowModal(false)}
-          onCreated={() => fetchTasks(filter)}
+          onCreated={() => {}}
         />
       )}
     </div>
