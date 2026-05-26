@@ -34,10 +34,11 @@ const TaskList = () => {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<string>("all");
 
-  const fetchTasks = useCallback(async () => {
+  const fetchTasks = useCallback(async (status?: string) => {
     setLoading(true);
     try {
-      const res = await api.get<Task[]>("/tasks");
+      const params = status && status !== "all" ? { status } : {};
+      const res = await api.get<Task[]>("/tasks", { params });
       setTasks(res.data);
     } catch {
       console.error("Failed to fetch tasks");
@@ -47,8 +48,8 @@ const TaskList = () => {
   }, []);
 
   useEffect(() => {
-    fetchTasks();
-  }, []);
+    fetchTasks(filter);
+  }, [filter, fetchTasks]);
 
   useEffect(() => {
     const socket = getSocket();
@@ -100,12 +101,8 @@ const TaskList = () => {
     };
   }, [tasks]);
 
-  // Optimized: Memoize filtered tasks to avoid recalculation on every render
-  const filteredTasks = useMemo(() => {
-    return filter === "all" 
-      ? tasks 
-      : tasks.filter(task => task.status === filter);
-  }, [tasks, filter]);
+  // When using server-side filtering, no need to filter again client-side
+  const filteredTasks = tasks;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-neutral-50 to-neutral-100">
@@ -353,7 +350,7 @@ const TaskList = () => {
       {showModal && (
         <CreateTaskModal
           onClose={() => setShowModal(false)}
-          onCreated={fetchTasks}
+          onCreated={() => fetchTasks(filter)}
         />
       )}
     </div>

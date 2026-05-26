@@ -33,16 +33,26 @@ export const getTasks = async (
   res: Response
 ): Promise<void> => {
   try {
-    let tasks;
+    const { status } = req.query;
 
-    if (req.user?.role === "admin") {
-      tasks = await Task.find().populate("assignedTo", "name email");
-    } else {
-      tasks = await Task.find({ assignedTo: req.user?.id }).populate(
-        "assignedTo",
-        "name email"
-      );
+    // Build query filter
+    const filter: Record<string, unknown> = {};
+    
+    // Role-based filtering
+    if (req.user?.role !== "admin") {
+      filter.assignedTo = req.user?.id;
     }
+
+    // Status filtering (if provided)
+    if (status && typeof status === "string" && status !== "all") {
+      filter.status = status;
+    }
+
+    // Execute optimized query with lean() for better performance
+    const tasks = await Task.find(filter)
+      .populate("assignedTo", "name email")
+      .lean()
+      .exec();
 
     res.json(tasks);
   } catch {

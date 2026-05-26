@@ -23,4 +23,8 @@ const TaskSchema = new Schema<ITask>(
   { timestamps: true }
 );
 
+// Performance optimization: Add compound index for common queries
+TaskSchema.index({ assignedTo: 1, status: 1 });
+TaskSchema.index({ status: 1 });
+
 export default mongoose.model<ITask>("Task", TaskSchema);
