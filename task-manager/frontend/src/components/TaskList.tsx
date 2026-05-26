@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import api from "../api/axios";
 import { useAuth } from "../context/AuthContext";
 import { getSocket } from "../socket/socket";
@@ -35,6 +35,7 @@ const TaskList = () => {
   const [filter, setFilter] = useState<string>("all");
 
   const fetchTasks = useCallback(async () => {
+    setLoading(true);
     try {
       const res = await api.get<Task[]>("/tasks");
       setTasks(res.data);
@@ -55,7 +56,8 @@ const TaskList = () => {
 
     const handleAssigned = (task: Task) => {
       setNotification(`New task assigned: "${task.title}"`);
-      fetchTasks();
+      // Optimized: Add new task to state instead of refetching
+      setTasks((prev) => [task, ...prev]);
     };
 
     socket.on("task:assigned", handleAssigned);
@@ -63,7 +65,7 @@ const TaskList = () => {
     return () => {
       socket.off("task:assigned", handleAssigned);
     };
-  }, [fetchTasks]);
+  }, []);
 
   const handleStatusChange = async (taskId: string, newStatus: string) => {
     try {
@@ -80,16 +82,30 @@ const TaskList = () => {
     }
   };
 
-  const filteredTasks = filter === "all" 
-    ? tasks 
-    : tasks.filter(task => task.status === filter);
+  // Optimized: Single pass to calculate stats instead of multiple filter calls
+  const taskStats = useMemo(() => {
+    let todo = 0, inProgress = 0, done = 0;
+    
+    for (const t of tasks) {
+      if (t.status === "todo") todo++;
+      else if (t.status === "in-progress") inProgress++;
+      else if (t.status === "done") done++;
+    }
+    
+    return {
+      total: tasks.length,
+      todo,
+      inProgress,
+      done,
+    };
+  }, [tasks]);
 
-  const taskStats = {
-    total: tasks.length,
-    todo: tasks.filter(t => t.status === "todo").length,
-    inProgress: tasks.filter(t => t.status === "in-progress").length,
-    done: tasks.filter(t => t.status === "done").length,
-  };
+  // Optimized: Memoize filtered tasks to avoid recalculation on every render
+  const filteredTasks = useMemo(() => {
+    return filter === "all" 
+      ? tasks 
+      : tasks.filter(task => task.status === filter);
+  }, [tasks, filter]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-neutral-50 to-neutral-100">
